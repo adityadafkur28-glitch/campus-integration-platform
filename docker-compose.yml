@@ -1,0 +1,120 @@
+services:
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  siakad-db:
+    image: mysql:8.0
+    container_name: siakad-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_siakad_123
+      MYSQL_DATABASE: campus_siakad_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - siakad_data:/var/lib/mysql
+
+  library-db:
+    image: mysql:8.0
+    container_name: library-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_library_123
+      MYSQL_DATABASE: campus_library_db
+    ports:
+      - "3308:3306"
+    volumes:
+      - library_data:/var/lib/mysql
+
+  finance-db:
+    image: postgres:16
+    container_name: finance-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_finance_123
+      POSTGRES_DB: campus_finance_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - finance_data:/var/lib/postgresql/data
+
+  siakad-service:
+    build:
+      context: ./apps/siakad-service
+    container_name: siakad-service
+    restart: always
+    depends_on:
+      - rabbitmq
+      - siakad-db
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./apps/siakad-service/.env
+
+  library-service:
+    build:
+      context: ./apps/library-service
+    container_name: library-service
+    restart: always
+    depends_on:
+      - library-db
+    ports:
+      - "8003:8003"
+    env_file:
+      - ./apps/library-service/.env
+
+  finance-service:
+    build:
+      context: ./apps/finance-service
+    container_name: finance-service
+    restart: always
+    depends_on:
+      - finance-db
+    ports:
+      - "8002:8002"
+    env_file:
+      - ./apps/finance-service/.env
+
+  integration-worker:
+    build:
+      context: ./integration-layer
+    container_name: integration-worker
+    restart: always
+    depends_on:
+      - rabbitmq
+      - finance-service
+      - library-service
+    env_file:
+      - ./integration-layer/.env
+
+  gateway-service:
+    build:
+      context: ./apps/gateway-service
+    container_name: gateway-service
+    restart: always
+    depends_on:
+      - siakad-service
+      - finance-service
+      - library-service
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./apps/gateway-service/.env
+
+volumes:
+  rabbitmq_data:
+  siakad_data:
+  library_data:
+  finance_data:
